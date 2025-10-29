@@ -11,63 +11,32 @@
       --height: 40px;
       --radius: 12px;
     }
-
-    body {
-      margin:0; font-family: Inter, sans-serif; color: var(--text); background:transparent;
-      display:flex; flex-direction:column; align-items:center; justify-content:center;
-      height:100vh;
-    }
-
-    .bar-wrap {
-      padding:8px 16px; background:rgba(0,0,0,0.35); border-radius:8px; 
-      display:flex; flex-direction:column; gap:6px; width:min(90vw,600px);
-    }
+    body { margin:0; font-family: Inter, sans-serif; color: var(--text); background:transparent;
+      display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; }
+    .bar-wrap { padding:8px 16px; background:rgba(0,0,0,0.35); border-radius:8px; 
+      display:flex; flex-direction:column; gap:6px; width:min(90vw,600px); }
     .header { display:flex; justify-content:space-between; font-size:14px; font-weight:600; }
     .route { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .eta { opacity:.9; }
     .trip { font-size:13px; opacity:0.8; text-align:right; }
-
-    .bar {
-      position:relative; width:100%; height:var(--height); background:var(--track);
-      border-radius:var(--radius); overflow:hidden;
-    }
-    .fill {
-      position:absolute; inset:0; width:0%; background:var(--fill); transition:width .25s linear;
-    }
-    .car {
-      position:absolute; top:50%; transform:translate(-50%,-50%); width:70px; height:auto;
-      left:0;
-    }
+    .bar { position:relative; width:100%; height:var(--height); background:var(--track);
+      border-radius:var(--radius); overflow:hidden; }
+    .fill { position:absolute; inset:0; width:0%; background:var(--fill); transition:width .25s linear; }
+    .car { position:absolute; top:50%; transform:translate(-50%,-50%); width:70px; height:auto; left:0; }
     .car img { width:100%; height:auto; display:block; }
-
-    /* connection panel */
-    .topbar {
-      margin-top:12px; display:flex; gap:8px; align-items:center;
-      background:rgba(0,0,0,0.4); padding:8px 12px; border-radius:6px;
-    }
-    .topbar input {
-      padding:4px 6px; border-radius:4px; border:none;
-      outline:none; font-size:14px;
-    }
-    .topbar button {
-      padding:4px 10px; border:none; border-radius:4px;
-      background:#2b67f6; color:#fff; font-weight:bold; cursor:pointer;
-    }
+    .topbar { margin-top:12px; display:flex; gap:8px; align-items:center;
+      background:rgba(0,0,0,0.4); padding:8px 12px; border-radius:6px; }
+    .topbar input { padding:4px 6px; border-radius:4px; border:none;
+      outline:none; font-size:14px; }
+    .topbar button { padding:4px 10px; border:none; border-radius:4px;
+      background:#2b67f6; color:#fff; font-weight:bold; cursor:pointer; }
     .topbar button.disconnect { background:#d94d4d; }
     #status { font-size:13px; opacity:0.9; }
-
-    /* debug log */
-    .log-panel {
-      margin-top:12px; padding:10px;
+    .log-panel { margin-top:12px; padding:10px;
       background:rgba(0,0,0,0.35); border-radius:6px;
       width:min(90vw,600px); max-height:120px; overflow-y:auto;
-      font-size:13px; line-height:1.4em;
-    }
-    .log-entry {
-      margin-bottom:4px;
-      opacity:1;
-      transition: opacity 2s ease;
-    }
+      font-size:13px; line-height:1.4em; }
+    .log-entry { margin-bottom:4px; opacity:1; transition: opacity 2s ease; }
     .log-entry.fade-out { opacity:0; }
     .log-entry b { color:#2b67f6; }
   </style>
@@ -86,191 +55,26 @@
     </div>
     <div class="trip" id="trip" style="display:none;">Trip Length: 0s</div>
   </div>
-
-  <!-- connect panel -->
   <div class="topbar">
     <input id="channelInput" type="text" placeholder="Twitch channel (e.g. dedefasuyi)">
     <button id="connectBtn">Connect</button>
     <button id="disconnectBtn" class="disconnect">Disconnect</button>
     <span id="status">Not connected</span>
   </div>
-
-  <!-- debug log -->
   <div class="log-panel" id="logPanel"></div>
-
-  <!-- tmi.js -->
   <script src="https://cdn.jsdelivr.net/npm/tmi.js@1.8.5/dist/tmi.min.js"></script>
   <script>
-    let client = null;
-    let totalSeconds = 0;
-    let endTime = 0;
-    let startTime = 0;
-    let accumulatedSeconds = 0;
-    let lastUpdateExtra = 0;
-    let ticking = false;
-
-    const $ = id => document.getElementById(id);
-    const logPanel = $("logPanel");
-
-    // ========= Helpers =========
-    function addLog(msg) {
-      const div = document.createElement("div");
-      div.className = "log-entry";
-      div.innerHTML = msg;
-      logPanel.prepend(div);
-      setTimeout(() => div.classList.add("fade-out"), 8000);
-      setTimeout(() => div.remove(), 10000);
-    }
-
-    function formatETA(sec) {
-      if (sec <= 0) return "ETA 0m";
-      const h = Math.floor(sec / 3600);
-      const m = Math.floor((sec % 3600) / 60);
-      const s = sec % 60;
-      if (h > 0) return `ETA ${h}h ${m}m ${s}s`;
-      if (m > 0) return `ETA ${m}m ${s}s`;
-      return `ETA ${s}s`;
-    }
-
-    function formatTrip(sec) {
-      if (sec <= 0) return "Trip Length: 0s";
-      const h = Math.floor(sec / 3600);
-      const m = Math.floor((sec % 3600) / 60);
-      const s = sec % 60;
-      if (h > 0) return `Trip Length: ${h}h ${m}m ${s}s`;
-      if (m > 0) return `Trip Length: ${m}m ${s}s`;
-      return `Trip Length: ${s}s`;
-    }
-
-    function updateTripDisplay() {
-      if (accumulatedSeconds > 0 && ticking) {
-        $("trip").style.display = "block";
-        $("trip").textContent = formatTrip(accumulatedSeconds);
-      } else {
-        $("trip").style.display = "none";
-      }
-    }
-
-    function tick() {
-      if (!ticking) return;
-      const now = Date.now();
-      const remaining = Math.max(0, Math.floor((endTime - now) / 1000));
-      const elapsed = (endTime - startTime - remaining * 1000) / 1000;
-      const pct = totalSeconds > 0 ? Math.min(100, (elapsed / totalSeconds) * 100) : 0;
-
-      $("fill").style.width = pct + "%";
-
-      const barRect = $("bar").getBoundingClientRect();
-      const carW = $("car").getBoundingClientRect().width || 70;
-      const usable = Math.max(0, barRect.width - carW);
-      $("car").style.left = usable * (pct / 100) + carW / 2 + "px";
-
-      if (remaining > 0) {
-        let text = formatETA(remaining);
-        if (lastUpdateExtra !== 0) {
-          const sign = lastUpdateExtra > 0 ? "+" : "";
-          text += ` (Updated ${sign}${lastUpdateExtra}s)`;
-        }
-        $("eta").textContent = text;
-        requestAnimationFrame(tick);
-      } else {
-        ticking = false;
-        $("eta").textContent = "Arrived!";
-        $("trip").style.display = "none";
-        addLog("⏹ Trip finished");
-      }
-    }
-
-    function resetTimer() {
-      totalSeconds = 0;
-      endTime = 0;
-      startTime = 0;
-      accumulatedSeconds = 0;
-      lastUpdateExtra = 0;
-      ticking = false;
-      $("fill").style.width = "0%";
-      $("car").style.left = "0px";
-      $("eta").textContent = "ETA 0m";
-      $("route").textContent = "Destination: Not Set";
-      updateTripDisplay();
-      addLog("🔄 Timer reset");
-    }
-
-    // ========= Twitch =========
-    function connectTwitch(channel){
-      $("status").textContent = "Connecting…";
-      try{ if(client) client.disconnect(); }catch(_){}
-      client = new tmi.Client({ connection:{secure:true,reconnect:true}, channels:[channel] });
-      client.connect().then(()=>{
-        $("status").textContent = `✅ Connected: ${channel}`;
-        addLog(`✅ Connected to <b>${channel}</b>`);
-      }).catch(e=>{
-        console.error("Twitch connect error", e);
-        $("status").textContent = `❌ Tried ${channel} but failed`;
-        addLog(`❌ Failed to connect to <b>${channel}</b>`);
-      });
-      client.on("message",(chan,tags,message,self)=>{
-        if(self) return;
-        onChat(tags["display-name"]||tags.username, message);
-      });
-    }
-
-    // ========= Chat Handling =========
-    function onChat(user, message){
-      const text = message.trim();
-      const parts = text.split(" ");
-      const cmd = parts[0].toLowerCase();
-
-      if (cmd === "!st" && parts[1]) {
-        const changeSecs = parseInt(parts[1], 10);
-        if (!isNaN(changeSecs)) {
-          const now = Date.now();
-          if (totalSeconds === 0 || !ticking) {
-            totalSeconds = Math.max(0, changeSecs);
-            accumulatedSeconds = totalSeconds;
-            startTime = now;
-            endTime = now + totalSeconds * 1000;
-            ticking = true;
-            lastUpdateExtra = changeSecs;
-            updateTripDisplay();
-            tick();
-            addLog(`▶️ ${user} started trip for <b>${changeSecs}s</b>`);
-          } else {
-            endTime += changeSecs * 1000;
-            totalSeconds += changeSecs;
-            accumulatedSeconds += changeSecs;
-            lastUpdateExtra = changeSecs;
-            updateTripDisplay();
-            addLog(`➕ ${user} added <b>${changeSecs}s</b>`);
-          }
-        }
-      }
-
-      if (cmd === "!sd" && parts.length > 1) {
-        const destination = parts.slice(1).join(" ");
-        $("route").textContent = "Destination: " + destination;
-        addLog(`📍 ${user} set destination to <b>${destination}</b>`);
-      }
-
-      if (cmd === "!reset") {
-        resetTimer();
-        addLog(`🔄 ${user} reset the trip`);
-      }
-    }
-
-    // ========= Buttons =========
-    $("connectBtn").addEventListener("click", () => {
-      const ch = $("channelInput").value.trim().toLowerCase();
-      if (ch) connectTwitch(ch);
-    });
-
-    $("disconnectBtn").addEventListener("click", () => {
-      if (client) {
-        try { client.disconnect(); } catch(_){}
-        $("status").textContent = "🔌 Disconnected";
-        addLog("🔌 Disconnected from chat");
-      }
-    });
+    let client = null, totalSeconds = 0, endTime = 0, startTime = 0, accumulatedSeconds = 0, lastUpdateExtra = 0, ticking = false;
+    const $ = id => document.getElementById(id); const logPanel = $("logPanel");
+    function addLog(msg){ const div=document.createElement("div"); div.className="log-entry"; div.innerHTML=msg; logPanel.prepend(div); setTimeout(()=>div.classList.add("fade-out"),8000); setTimeout(()=>div.remove(),10000); }
+    function formatETA(sec){ if(sec<=0) return "ETA 0m"; const h=Math.floor(sec/3600); const m=Math.floor((sec%3600)/60); const s=sec%60; if(h>0)return`ETA ${h}h ${m}m ${s}s`; if(m>0)return`ETA ${m}m ${s}s`; return`ETA ${s}s`; }
+    function formatTrip(sec){ if(sec<=0) return "Trip Length: 0s"; const h=Math.floor(sec/3600); const m=Math.floor((sec%3600)/60); const s=sec%60; if(h>0)return`Trip Length: ${h}h ${m}m ${s}s`; if(m>0)return`Trip Length: ${m}m ${s}s`; return`Trip Length: ${s}s`; }
+    function updateTripDisplay(){ if(accumulatedSeconds>0&&ticking){ $("trip").style.display="block"; $("trip").textContent=formatTrip(accumulatedSeconds);} else{$("trip").style.display="none";} }
+    function tick(){ if(!ticking) return; const now=Date.now(); const remaining=Math.max(0,Math.floor((endTime-now)/1000)); const elapsed=(endTime-startTime-remaining*1000)/1000; const pct=totalSeconds>0?Math.min(100,(elapsed/totalSeconds)*100):0; $("fill").style.width=pct+"%"; const barRect=$("bar").getBoundingClientRect(); const carW=$("car").getBoundingClientRect().width||70; const usable=Math.max(0,barRect.width-carW); $("car").style.left=usable*(pct/100)+carW/2+"px"; if(remaining>0){ let text=formatETA(remaining); if(lastUpdateExtra!==0){ const sign=lastUpdateExtra>0?"+":""; text+=` (Updated ${sign}${lastUpdateExtra}s)`;} $("eta").textContent=text; requestAnimationFrame(tick);} else{ ticking=false; $("eta").textContent="Arrived!"; $("trip").style.display="none"; addLog("⏹ Trip finished"); } }
+    function resetTimer(){ totalSeconds=0; endTime=0; startTime=0; accumulatedSeconds=0; lastUpdateExtra=0; ticking=false; $("fill").style.width="0%"; $("car").style.left="0px"; $("eta").textContent="ETA 0m"; $("route").textContent="Destination: Not Set"; updateTripDisplay(); addLog("🔄 Timer reset"); }
+    function connectTwitch(channel){ $("status").textContent="Connecting…"; try{ if(client) client.disconnect(); }catch(_){} client=new tmi.Client({connection:{secure:true,reconnect:true},channels:[channel]}); client.connect().then(()=>{$("status").textContent=`✅ Connected: ${channel}`; addLog(`✅ Connected to <b>${channel}</b>`);}).catch(e=>{console.error("Twitch connect error",e); $("status").textContent=`❌ Tried ${channel} but failed`; addLog(`❌ Failed to connect to <b>${channel}</b>`);}); client.on("message",(chan,tags,message,self)=>{ if(self) return; onChat(tags["display-name"]||tags.username,message); }); }
+    function onChat(user,message){ const text=message.trim(); const parts=text.split(" "); const cmd=parts[0].toLowerCase(); if(cmd==="!st"&&parts[1]){ const changeSecs=parseInt(parts[1],10); if(!isNaN(changeSecs)){ const now=Date.now(); if(totalSeconds===0||!ticking){ totalSeconds=Math.max(0,changeSecs); accumulatedSeconds=totalSeconds; startTime=now; endTime=now+totalSeconds*1000; ticking=true; lastUpdateExtra=changeSecs; updateTripDisplay(); tick(); addLog(`▶️ ${user} started trip for <b>${changeSecs}s</b>`);} else{ endTime+=changeSecs*1000; totalSeconds+=changeSecs; accumulatedSeconds+=changeSecs; lastUpdateExtra=changeSecs; updateTripDisplay(); addLog(`➕ ${user} added <b>${changeSecs}s</b>`);} } } if(cmd==="!sd"&&parts.length>1){ const destination=parts.slice(1).join(" "); $("route").textContent="Destination: "+destination; addLog(`📍 ${user} set destination to <b>${destination}</b>`);} if(cmd==="!reset"){ resetTimer(); addLog(`🔄 ${user} reset the trip`);} }
+    $("connectBtn").addEventListener("click",()=>{ const ch=$("channelInput").value.trim().toLowerCase(); if(ch) connectTwitch(ch); }); $("disconnectBtn").addEventListener("click",()=>{ if(client){ try{client.disconnect();}catch(_){ } $("status").textContent="🔌 Disconnected"; addLog("🔌 Disconnected from chat"); } });
   </script>
 </body>
 </html>
